@@ -297,8 +297,24 @@ void sim_t::interactive()
     std::string s;
     char cmd_str[MAX_CMD_STR+1]; // only used for following fscanf
     // first get commands from file, if cmd_file has been set
-    if (cmd_file && !feof(cmd_file) && fscanf(cmd_file,"%" STR(MAX_CMD_STR) "[^\n]\n", cmd_str)==1) {
-                                                      // up to MAX_CMD_STR characters before \n, skipping \n
+
+    if (!cmd_string.empty()) {
+        std::istringstream stream(cmd_string);
+        std::string line;
+        while (std::getline(stream, line)) {
+            if (!line.empty()) {
+                cmd_queue.push(line);
+            }
+        }
+        cmd_string.clear();
+    }
+
+    if (!cmd_queue.empty()) {
+        s = cmd_queue.front();
+        cmd_queue.pop();
+        sout_.rdbuf(std::cerr.rdbuf());
+    } else if (cmd_file && !feof(cmd_file) && fscanf(cmd_file,"%" STR(MAX_CMD_STR) "[^\n]\n", cmd_str)==1) {
+      // up to MAX_CMD_STR characters before \n, skipping \n
       s = cmd_str;
       // while we get input from file, output goes to stderr
       sout_.rdbuf(std::cerr.rdbuf());

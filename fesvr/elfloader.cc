@@ -132,3 +132,38 @@ std::map<std::string, uint64_t> load_elf(const char* fn, memif_t* memif, reg_t* 
 
   return symbols;
 }
+
+std::map<std::string, uint64_t> load_elf_from_memory(const char* buf, size_t size, memif_t* memif, reg_t* entry,
+                                                     reg_t load_offset, unsigned required_xlen)
+{
+  // 创建临时文件
+  char temp_filename[] = "/tmp/spike_elf_XXXXXX";
+  int fd = mkstemp(temp_filename);
+  if (fd == -1) {
+    throw std::runtime_error("Failed to create temporary ELF file");
+  }
+
+  // 写入ELF数据
+  if (write(fd, buf, size) != static_cast<ssize_t>(size)) {
+    close(fd);
+    unlink(temp_filename);
+    throw std::runtime_error("Failed to write ELF data to temporary file");
+  }
+  close(fd);
+
+  try {
+    // 使用现有的load_elf函数
+    std::map<std::string, uint64_t> result = load_elf(temp_filename, memif, entry, load_offset, required_xlen);
+
+    // 清理临时文件
+    unlink(temp_filename);
+
+    return result;
+  } catch (...) {
+    // 确保在异常情况下也清理临时文件
+    unlink(temp_filename);
+    throw;
+  }
+}
+
+

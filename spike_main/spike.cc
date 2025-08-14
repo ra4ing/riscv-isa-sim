@@ -41,6 +41,7 @@ static void help(int exit_code = 1)
   fprintf(stderr, "  --halted              Start halted, allowing a debugger to connect\n");
   fprintf(stderr, "  --log=<name>          File name for option -l\n");
   fprintf(stderr, "  --debug-cmd=<name>    Read commands from file (use with -d)\n");
+  fprintf(stderr, "  --debug-cmd-from-string=<cmds>  Read commands from string (use with -d)\n");
   fprintf(stderr, "  --isa=<name>          RISC-V ISA string [default %s]\n", DEFAULT_ISA);
   fprintf(stderr, "  --pmpregions=<n>      Number of PMP regions [default 16]\n");
   fprintf(stderr, "  --pmpgranularity=<n>  PMP Granularity in bytes [default 4]\n");
@@ -433,13 +434,23 @@ int main(int argc, char** argv)
                 [&](const char UNUSED *s){log_commits = true;});
   parser.option(0, "log", 1,
                 [&](const char* s){log_path = s;});
+
+  std::string cmd_string;
+  parser.option(0, "debug-cmd-from-string", 1, [&](const char* s){
+     cmd_string = s;
+  });
+
   FILE *cmd_file = NULL;
-  parser.option(0, "debug-cmd", 1, [&](const char* s){
-     if ((cmd_file = fopen(s, "r"))==NULL) {
+  if (cmd_string.empty()) {
+    parser.option(0, "debug-cmd", 1, [&](const char* s){
+      if ((cmd_file = fopen(s, "r"))==NULL) {
         fprintf(stderr, "Unable to open command file '%s'\n", s);
         exit(-1);
-     }
-  });
+      }
+    });
+  }
+  
+  
   parser.option(0, "blocksz", 1, [&](const char* s){
     blocksz = strtoull(s, 0, 0);
     const unsigned min_blocksz = 16;
@@ -511,7 +522,8 @@ int main(int argc, char** argv)
   sim_t s(&cfg, halted,
       mems, plugin_device_factories, htif_args, dm_config, log_path, dtb_enabled, dtb_file,
       socket,
-      cmd_file);
+      cmd_file,
+      cmd_string);
   std::unique_ptr<remote_bitbang_t> remote_bitbang((remote_bitbang_t *) NULL);
   std::unique_ptr<jtag_dtm_t> jtag_dtm(
       new jtag_dtm_t(&s.debug_module, dmi_rti));
