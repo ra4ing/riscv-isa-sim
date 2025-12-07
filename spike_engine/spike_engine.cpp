@@ -440,11 +440,27 @@ bool SpikeEngine::step_processor() {
         // Execute one instruction
         proc_->step(1);
         return true;
+    } catch (trap_t& t) {
+        // Catch RISC-V traps (illegal instruction, access faults, etc.)
+        std::ostringstream oss;
+        oss << "Processor trap: " << t.name()
+            << " (cause=" << t.cause() << ")";
+
+        if (t.has_tval()) {
+            oss << ", tval=0x" << std::hex << t.get_tval() << std::dec;
+        }
+
+        last_error_ = oss.str();
+        return false;
+    } catch (trap_debug_mode&) {
+        // Debug mode entry (not an error in fuzzing context, just skip)
+        last_error_ = "Processor entered debug mode";
+        return false;
     } catch (const std::exception& e) {
         last_error_ = std::string("Processor step failed: ") + e.what();
         return false;
     } catch (...) {
-        // Catch all other exceptions (Spike internal exceptions, trap_t, etc.)
+        // Catch all other exceptions
         last_error_ = "Processor step failed: Caught an unknown exception!";
         return false;
     }
