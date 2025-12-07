@@ -33,10 +33,12 @@ Checkpoint::Checkpoint()
 
 SpikeEngine::SpikeEngine(const std::string& elf_path,
                          const std::string& isa,
-                         size_t num_instrs)
+                         size_t num_instrs,
+                         bool verbose)
     : elf_path_(elf_path)
     , isa_(isa)
     , num_instrs_(num_instrs)
+    , verbose_(verbose)
     , proc_(nullptr)
     , instruction_region_start_(0)
     , instruction_region_end_(0)
@@ -98,14 +100,18 @@ bool SpikeEngine::initialize() {
 
         // Low memory for boot code (starting after Spike's reserved region)
         mems.push_back(std::make_pair(0x1000, new mem_t(0xF000)));  // 60KB from 0x1000
-        std::cout << "[SpikeEngine] Created boot memory: 0x1000 - 0x10000" << std::endl;
+        if (verbose_) {
+            std::cout << "[SpikeEngine] Created boot memory: 0x1000 - 0x10000" << std::endl;
+        }
 
         // Main memory for ELF
         reg_t mem_base = 0x80000000;
         size_t mem_size = 0x10000000; // 256MB
         mems.push_back(std::make_pair(mem_base, new mem_t(mem_size)));
-        std::cout << "[SpikeEngine] Created main memory: 0x" << std::hex << mem_base
-                  << " - 0x" << (mem_base + mem_size) << std::dec << std::endl;
+        if (verbose_) {
+            std::cout << "[SpikeEngine] Created main memory: 0x" << std::hex << mem_base
+                      << " - 0x" << (mem_base + mem_size) << std::dec << std::endl;
+        }
 
         // Create simulator
         std::vector<std::string> htif_args = {elf_path_};
@@ -131,9 +137,13 @@ bool SpikeEngine::initialize() {
         // htif_t::start() will:
         // 1. Call load_program() to parse ELF and load into memory
         // 2. Call reset() to initialize processor
-        std::cout << "[SpikeEngine] Starting HTIF to load ELF..." << std::endl;
+        if (verbose_) {
+            std::cout << "[SpikeEngine] Starting HTIF to load ELF..." << std::endl;
+        }
         sim_->start();
-        std::cout << "[SpikeEngine] HTIF start() completed" << std::endl;
+        if (verbose_) {
+            std::cout << "[SpikeEngine] HTIF start() completed" << std::endl;
+        }
 
         // Get processor 0 (after HTIF start)
         proc_ = sim_->get_core(0);
@@ -144,16 +154,24 @@ bool SpikeEngine::initialize() {
 
         // Check PC after HTIF initialization
         uint64_t boot_pc = proc_->get_state()->pc;
-        std::cout << "[SpikeEngine] PC after HTIF start (boot address): 0x" << std::hex << boot_pc << std::dec << std::endl;
+        if (verbose_) {
+            std::cout << "[SpikeEngine] PC after HTIF start (boot address): 0x" << std::hex << boot_pc << std::dec << std::endl;
+        }
 
         // Check if boot address has valid instructions (HTIF boot code)
-        std::cout << "[SpikeEngine] Reading memory at boot address..." << std::endl;
+        if (verbose_) {
+            std::cout << "[SpikeEngine] Reading memory at boot address..." << std::endl;
+        }
         uint32_t boot_instr = 0;
         try {
             boot_instr = read_memory(boot_pc);
-            std::cout << "[SpikeEngine] Instruction at boot address: 0x" << std::hex << boot_instr << std::dec << std::endl;
+            if (verbose_) {
+                std::cout << "[SpikeEngine] Instruction at boot address: 0x" << std::hex << boot_instr << std::dec << std::endl;
+            }
         } catch (...) {
-            std::cout << "[SpikeEngine] Failed to read memory at boot address" << std::endl;
+            if (verbose_) {
+                std::cout << "[SpikeEngine] Failed to read memory at boot address" << std::endl;
+            }
             throw;
         }
 
@@ -165,11 +183,15 @@ bool SpikeEngine::initialize() {
 
         // Find _start symbol
         uint64_t start_addr = read_symbol_address("_start");
-        std::cout << "[SpikeEngine] _start address: 0x" << std::hex << start_addr << std::dec << std::endl;
+        if (verbose_) {
+            std::cout << "[SpikeEngine] _start address: 0x" << std::hex << start_addr << std::dec << std::endl;
+        }
 
         // Verify _start has valid instructions
         uint32_t start_instr = read_memory(start_addr);
-        std::cout << "[SpikeEngine] Instruction at _start: 0x" << std::hex << start_instr << std::dec << std::endl;
+        if (verbose_) {
+            std::cout << "[SpikeEngine] Instruction at _start: 0x" << std::hex << start_instr << std::dec << std::endl;
+        }
 
         if (start_instr == 0) {
             last_error_ = "Memory at _start is empty - ELF not loaded properly";
@@ -180,23 +202,31 @@ bool SpikeEngine::initialize() {
         // Otherwise, directly set PC to _start
         uint64_t entry_pc;
         if (boot_instr != 0 && boot_pc != start_addr) {
-            std::cout << "[SpikeEngine] Boot code found, executing from boot to _start..." << std::endl;
+            if (verbose_) {
+                std::cout << "[SpikeEngine] Boot code found, executing from boot to _start..." << std::endl;
+            }
             entry_pc = boot_pc;
         } else {
-            std::cout << "[SpikeEngine] No boot code, setting PC directly to _start" << std::endl;
+            if (verbose_) {
+                std::cout << "[SpikeEngine] No boot code, setting PC directly to _start" << std::endl;
+            }
             proc_->get_state()->pc = start_addr;
             entry_pc = start_addr;
         }
 
-        std::cout << "[SpikeEngine] main address: 0x" << std::hex << instruction_region_start_ << std::dec << std::endl;
+        if (verbose_) {
+            std::cout << "[SpikeEngine] main address: 0x" << std::hex << instruction_region_start_ << std::dec << std::endl;
+        }
 
         // Execute from entry to main
         if (entry_pc != instruction_region_start_) {
             const size_t max_steps = 100000;
             size_t steps = 0;
 
-            std::cout << "[SpikeEngine] Executing from entry (0x" << std::hex << entry_pc
-                      << ") to main (0x" << instruction_region_start_ << ")" << std::dec << std::endl;
+            if (verbose_) {
+                std::cout << "[SpikeEngine] Executing from entry (0x" << std::hex << entry_pc
+                          << ") to main (0x" << instruction_region_start_ << ")" << std::dec << std::endl;
+            }
 
             while (proc_->get_state()->pc != instruction_region_start_ && steps < max_steps) {
                 uint64_t current_pc = proc_->get_state()->pc;
@@ -211,7 +241,7 @@ bool SpikeEngine::initialize() {
                 steps++;
 
                 // Debug: Print PC every 10000 steps
-                if (steps % 10000 == 0) {
+                if (verbose_ && steps % 10000 == 0) {
                     std::cout << "[DEBUG] Step " << steps << ", PC: 0x"
                               << std::hex << proc_->get_state()->pc << std::dec << std::endl;
                 }
@@ -226,9 +256,13 @@ bool SpikeEngine::initialize() {
                 return false;
             }
 
-            std::cout << "[SpikeEngine] Reached main after " << steps << " steps" << std::endl;
+            if (verbose_) {
+                std::cout << "[SpikeEngine] Reached main after " << steps << " steps" << std::endl;
+            }
         } else {
-            std::cout << "[SpikeEngine] Entry point is already at main" << std::endl;
+            if (verbose_) {
+                std::cout << "[SpikeEngine] Entry point is already at main" << std::endl;
+            }
         }
 
         initialized_ = true;
