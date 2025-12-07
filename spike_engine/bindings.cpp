@@ -21,10 +21,11 @@ PYBIND11_MODULE(spike_engine, m) {
 
     // SpikeEngine class
     py::class_<SpikeEngine>(m, "SpikeEngine")
-        .def(py::init<const std::string&, const std::string&, size_t>(),
+        .def(py::init<const std::string&, const std::string&, size_t, bool>(),
              py::arg("elf_path"),
              py::arg("isa") = "rv64gc",
              py::arg("num_instrs") = 200,
+             py::arg("verbose") = false,
              R"pbdoc(
              Create a SpikeEngine instance
 
@@ -32,6 +33,7 @@ PYBIND11_MODULE(spike_engine, m) {
                  elf_path: Path to pre-compiled ELF file with nops
                  isa: ISA string (default: "rv64gc")
                  num_instrs: Number of instructions to generate (default: 200)
+                 verbose: Enable verbose output (default: false)
              )pbdoc")
 
         .def_static("get_instruction_size", &SpikeEngine::get_instruction_size,

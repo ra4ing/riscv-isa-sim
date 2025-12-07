@@ -104,10 +104,12 @@ public:
      * @param elf_path Path to pre-compiled ELF file
      * @param isa ISA string (e.g., "rv64gc")
      * @param num_instrs Number of instructions to generate (nops in ELF)
+     * @param verbose Enable verbose output (default: false)
      */
     SpikeEngine(const std::string& elf_path,
                 const std::string& isa,
-                size_t num_instrs);
+                size_t num_instrs,
+                bool verbose = false);
 
     /**
      * Destructor
@@ -237,6 +239,7 @@ private:
     std::string elf_path_;
     std::string isa_;
     size_t num_instrs_;
+    bool verbose_;
 
     // Spike simulator
     std::unique_ptr<cfg_t> cfg_;
