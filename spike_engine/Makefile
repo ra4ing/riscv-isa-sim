@@ -54,7 +54,7 @@ SPIKE_LIBS = $(SPIKE_BUILD_DIR)/libriscv.a \
              $(SPIKE_BUILD_DIR)/libfdt.a
 
 # System libraries
-SYS_LIBS = -lpthread -ldl
+SYS_LIBS = -lpthread -ldl -lboost_regex -lboost_system
 
 # Source files
 ENGINE_SOURCES = spike_engine.cpp
