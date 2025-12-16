@@ -170,9 +170,9 @@ public:
      *       are written to memory. Spike automatically updates PC by 2 or 4 bytes
      *       based on the instruction encoding.
      */
-    uint64_t execute_instruction(uint32_t machine_code,
-                                  const std::vector<int>& source_regs,
-                                  int64_t immediate = 0);
+    std::vector<uint64_t> execute_instruction(uint32_t machine_code,
+                                              const std::vector<int>& source_regs,
+                                              int64_t immediate = 0);
 
     /**
      * Get value of a general-purpose register

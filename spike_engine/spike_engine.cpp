@@ -343,9 +343,9 @@ void SpikeEngine::restore_checkpoint() {
     restore_state(checkpoint_);
 }
 
-uint64_t SpikeEngine::execute_instruction(uint32_t machine_code,
-                                          const std::vector<int>& source_regs,
-                                          int64_t immediate) {
+std::vector<uint64_t> SpikeEngine::execute_instruction(uint32_t machine_code,
+                                                        const std::vector<int>& source_regs,
+                                                        int64_t immediate) {
     if (!initialized_) {
         throw std::runtime_error("SpikeEngine not initialized");
     }
@@ -403,13 +403,11 @@ uint64_t SpikeEngine::execute_instruction(uint32_t machine_code,
     // (Spike automatically updates PC based on instruction length)
     next_instruction_addr_ = get_pc();
 
-    // Compute XOR from pre-execution register values
-    uint64_t xor_value = compute_xor(reg_values);
-
     // Increment instruction index
     current_instr_index_++;
 
-    return xor_value;
+    // Return source register values directly (Python will compute XOR)
+    return reg_values;
 }
 
 uint64_t SpikeEngine::get_xpr(int reg_index) const {

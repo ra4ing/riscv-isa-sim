@@ -73,7 +73,7 @@ PYBIND11_MODULE(spike_engine, m) {
                  immediate: Immediate value (default: 0)
 
              Returns:
-                 XOR value computed from source registers and immediate
+                 List of source register values (and immediate if provided)
              )pbdoc")
 
         .def("get_xpr", &SpikeEngine::get_xpr,
