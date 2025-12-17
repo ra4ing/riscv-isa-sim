@@ -18,6 +18,32 @@ class cfg_t;
 namespace spike_engine {
 
 /**
+ * Execution result containing register values before and after instruction execution
+ *
+ * This structure is returned by execute_instruction() and contains:
+ * - source_values_before: Source register values BEFORE execution (for XOR computation)
+ * - dest_values_after: Destination register values AFTER execution (for bug filtering)
+ *
+ * Design Rationale:
+ * - Python layer computes XOR from source_values_before for deduplication
+ * - Python layer uses dest_values_after for bug pattern matching
+ * - Separating these concerns keeps spike_engine simple and focused on execution
+ */
+struct ExecutionResult {
+    // Source register values captured BEFORE instruction execution
+    // Used for XOR-based deduplication in Python layer
+    std::vector<uint64_t> source_values_before;
+
+    // Destination register values captured AFTER instruction execution
+    // Used for bug filtering in Python layer (e.g., checking if sc.w returned 1)
+    std::vector<uint64_t> dest_values_after;
+
+    ExecutionResult() = default;
+    ExecutionResult(const std::vector<uint64_t>& src, const std::vector<uint64_t>& dst)
+        : source_values_before(src), dest_values_after(dst) {}
+};
+
+/**
  * Checkpoint state for processor
  *
  * Represents a lightweight snapshot of processor state at a specific point.
@@ -135,29 +161,33 @@ public:
     void restore_checkpoint();
 
     /**
-     * Execute one instruction with given machine code
+     * Execute one instruction and return register values for XOR and bug filtering
      *
      * Automatically detects instruction size (2 or 4 bytes), writes it to the
-     * next available memory address, executes it, and computes an XOR value
-     * from source registers for validation purposes.
+     * next available memory address, executes it, and captures register values
+     * before and after execution.
      *
      * Process:
      *   1. Detect instruction size from machine_code bits[1:0]
      *   2. Verify sufficient space in instruction region
      *   3. Verify PC matches expected address (consistency check)
      *   4. Write instruction to memory (2 or 4 bytes as appropriate)
-     *   5. Read source register values (BEFORE execution)
+     *   5. Read source register values (BEFORE execution) -> source_values_before
      *   6. Execute instruction (single step)
-     *   7. Update next_instruction_addr to current PC
-     *   8. Increment instruction index counter
-     *   9. Compute and return XOR validation value
+     *   7. Read destination register values (AFTER execution) -> dest_values_after
+     *   8. Update next_instruction_addr to current PC
+     *   9. Increment instruction index counter
+     *  10. Return ExecutionResult with both sets of values
      *
      * @param machine_code 32-bit instruction encoding (may be 16-bit compressed
      *                     instruction zero-padded to 32 bits)
-     * @param source_regs List of source register indices (0-31) to include in XOR
-     * @param immediate Optional immediate value to include in XOR (default: 0)
+     * @param source_regs List of source register indices (0-31) to read before execution
+     * @param dest_regs List of destination register indices (0-31) to read after execution
+     * @param immediate Optional immediate value to include in source_values (default: 0)
      *
-     * @return XOR value computed as: (reg[0] << 0) ^ (reg[1] << 1) ^ ...
+     * @return ExecutionResult containing:
+     *   - source_values_before: Source register values + immediate (for XOR in Python)
+     *   - dest_values_after: Destination register values (for bug filtering in Python)
      *
      * @throws std::runtime_error if:
      *   - Engine not initialized
@@ -170,9 +200,10 @@ public:
      *       are written to memory. Spike automatically updates PC by 2 or 4 bytes
      *       based on the instruction encoding.
      */
-    std::vector<uint64_t> execute_instruction(uint32_t machine_code,
-                                              const std::vector<int>& source_regs,
-                                              int64_t immediate = 0);
+    ExecutionResult execute_instruction(uint32_t machine_code,
+                                       const std::vector<int>& source_regs,
+                                       const std::vector<int>& dest_regs,
+                                       int64_t immediate = 0);
 
     /**
      * Get value of a general-purpose register

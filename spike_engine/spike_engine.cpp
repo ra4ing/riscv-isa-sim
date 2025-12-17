@@ -343,9 +343,10 @@ void SpikeEngine::restore_checkpoint() {
     restore_state(checkpoint_);
 }
 
-std::vector<uint64_t> SpikeEngine::execute_instruction(uint32_t machine_code,
-                                                        const std::vector<int>& source_regs,
-                                                        int64_t immediate) {
+ExecutionResult SpikeEngine::execute_instruction(uint32_t machine_code,
+                                                  const std::vector<int>& source_regs,
+                                                  const std::vector<int>& dest_regs,
+                                                  int64_t immediate) {
     if (!initialized_) {
         throw std::runtime_error("SpikeEngine not initialized");
     }
@@ -375,28 +376,37 @@ std::vector<uint64_t> SpikeEngine::execute_instruction(uint32_t machine_code,
         throw std::runtime_error("Failed to write machine code to memory");
     }
 
-    // CRITICAL: Read source register values BEFORE execution
+    // STEP 1: Read source register values BEFORE execution
     // This ensures we capture the values that will be used by the instruction,
     // even if the destination register overlaps with source registers
     // (e.g., add x10, x10, x11 - we want the OLD value of x10, not the result)
-    std::vector<uint64_t> reg_values;
+    std::vector<uint64_t> source_values;
     for (int reg_idx : source_regs) {
         if (reg_idx >= 0 && reg_idx < 32) {
-            reg_values.push_back(get_xpr(reg_idx));
+            source_values.push_back(get_xpr(reg_idx));
         }
     }
 
-    // Add immediate if provided
+    // Add immediate if provided (for XOR computation in Python)
     if (immediate != 0) {
-        reg_values.push_back(static_cast<uint64_t>(immediate));
+        source_values.push_back(static_cast<uint64_t>(immediate));
     }
 
-    // Execute one instruction AFTER reading source registers
+    // STEP 2: Execute instruction
     if (!step_processor()) {
         std::ostringstream oss;
         oss << "Failed to execute instruction at 0x" << std::hex << instr_addr
             << std::dec << " - " << last_error_;
         throw std::runtime_error(oss.str());
+    }
+
+    // STEP 3: Read destination register values AFTER execution
+    // These values are used for bug filtering in Python (e.g., checking if sc.w returned 1)
+    std::vector<uint64_t> dest_values;
+    for (int reg_idx : dest_regs) {
+        if (reg_idx >= 0 && reg_idx < 32) {
+            dest_values.push_back(get_xpr(reg_idx));
+        }
     }
 
     // Update next instruction address to current PC
@@ -406,8 +416,8 @@ std::vector<uint64_t> SpikeEngine::execute_instruction(uint32_t machine_code,
     // Increment instruction index
     current_instr_index_++;
 
-    // Return source register values directly (Python will compute XOR)
-    return reg_values;
+    // Return both source values (for XOR) and dest values (for bug filtering)
+    return ExecutionResult(source_values, dest_values);
 }
 
 uint64_t SpikeEngine::get_xpr(int reg_index) const {

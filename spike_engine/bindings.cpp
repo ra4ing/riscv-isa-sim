@@ -11,6 +11,17 @@ using namespace spike_engine;
 PYBIND11_MODULE(spike_engine, m) {
     m.doc() = "Efficient Spike execution engine with checkpointing for DiveFuzz";
 
+    // ExecutionResult class
+    py::class_<ExecutionResult>(m, "ExecutionResult")
+        .def(py::init<>())
+        .def(py::init<const std::vector<uint64_t>&, const std::vector<uint64_t>&>(),
+             py::arg("source_values_before"),
+             py::arg("dest_values_after"))
+        .def_readwrite("source_values_before", &ExecutionResult::source_values_before,
+             "Source register values captured BEFORE execution (for XOR computation)")
+        .def_readwrite("dest_values_after", &ExecutionResult::dest_values_after,
+             "Destination register values captured AFTER execution (for bug filtering)");
+
     // Checkpoint class
     py::class_<Checkpoint>(m, "Checkpoint")
         .def(py::init<>())
@@ -63,17 +74,21 @@ PYBIND11_MODULE(spike_engine, m) {
         .def("execute_instruction", &SpikeEngine::execute_instruction,
              py::arg("machine_code"),
              py::arg("source_regs"),
+             py::arg("dest_regs"),
              py::arg("immediate") = 0,
              R"pbdoc(
-             Execute one instruction
+             Execute one instruction and return register values
 
              Args:
                  machine_code: 32-bit machine code
-                 source_regs: List of source register indices
+                 source_regs: List of source register indices (read before execution)
+                 dest_regs: List of destination register indices (read after execution)
                  immediate: Immediate value (default: 0)
 
              Returns:
-                 List of source register values (and immediate if provided)
+                 ExecutionResult with:
+                 - source_values_before: Source register values before execution (for XOR)
+                 - dest_values_after: Destination register values after execution (for bug filtering)
              )pbdoc")
 
         .def("get_xpr", &SpikeEngine::get_xpr,
