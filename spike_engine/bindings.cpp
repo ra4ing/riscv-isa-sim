@@ -11,6 +11,9 @@ using namespace spike_engine;
 PYBIND11_MODULE(spike_engine, m) {
     m.doc() = "Efficient Spike execution engine with checkpointing for DiveFuzz";
 
+    // Constants
+    m.attr("IMMEDIATE_NOT_PRESENT") = IMMEDIATE_NOT_PRESENT;
+
     // ExecutionResult class
     py::class_<ExecutionResult>(m, "ExecutionResult")
         .def(py::init<>())

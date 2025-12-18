@@ -17,6 +17,9 @@ class cfg_t;
 
 namespace spike_engine {
 
+// Special value to indicate instruction without immediate operand
+constexpr int64_t IMMEDIATE_NOT_PRESENT = INT64_MIN;
+
 /**
  * Execution result containing register values before and after instruction execution
  *

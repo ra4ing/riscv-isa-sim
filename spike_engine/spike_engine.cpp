@@ -387,8 +387,8 @@ ExecutionResult SpikeEngine::execute_instruction(uint32_t machine_code,
         }
     }
 
-    // Add immediate if provided (for XOR computation in Python)
-    if (immediate != 0) {
+    // Add immediate if instruction has one (including immediate=0)
+    if (immediate != IMMEDIATE_NOT_PRESENT) {
         source_values.push_back(static_cast<uint64_t>(immediate));
     }
 
